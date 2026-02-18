@@ -19,6 +19,12 @@
 .DS_Store
 *.pem
 
+# certificates
+/certs/*.pem
+/certs/*.der
+/certs/*.p12
+/certs/*.crt
+
 # debug
 npm-debug.log*
 yarn-debug.log*
@@ -26,6 +32,7 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # local env files
+.env
 .env.local
 .env.development.local
 .env.test.local
