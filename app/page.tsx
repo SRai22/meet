@@ -1,17 +1,24 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { encodePassphrase, generateRoomId, randomString } from '@/lib/client-utils';
 import styles from '../styles/Home.module.css';
 
+interface ActiveRoom {
+  name: string;
+  numParticipants: number;
+  creationTime: number;
+}
+
 function Tabs(props: React.PropsWithChildren<{}>) {
   const searchParams = useSearchParams();
-  const tabIndex = searchParams?.get('tab') === 'custom' ? 1 : 0;
+  const tab = searchParams?.get('tab');
+  const tabIndex = tab === 'custom' ? 1 : tab === 'join' ? 2 : 0;
 
   const router = useRouter();
   function onTabSelected(index: number) {
-    const tab = index === 1 ? 'custom' : 'demo';
+    const tab = index === 1 ? 'custom' : index === 2 ? 'join' : 'demo';
     router.push(`/?tab=${tab}`);
   }
 
@@ -37,6 +44,110 @@ function Tabs(props: React.PropsWithChildren<{}>) {
       <div className={styles.tabSelect}>{tabs}</div>
       {/* @ts-ignore */}
       {props.children[tabIndex]}
+    </div>
+  );
+}
+
+function JoinExistingTab(props: { label: string }) {
+  const router = useRouter();
+  const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchActiveRooms = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/rooms/active');
+      const data = await response.json();
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setActiveRooms(data.rooms || []);
+      }
+    } catch (err) {
+      setError('Failed to fetch active rooms');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchActiveRooms();
+    // Refresh every 5 seconds
+    const interval = setInterval(fetchActiveRooms, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const joinRoom = (roomName: string) => {
+    router.push(`/rooms/${roomName}`);
+  };
+
+  const formatTime = (timestamp: number) => {
+    const seconds = Math.floor((Date.now() / 1000 - timestamp));
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+  };
+
+  return (
+    <div className={styles.tabContent}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <p style={{ margin: 0 }}>Join an existing meeting session.</p>
+        <button 
+          className="lk-button" 
+          onClick={fetchActiveRooms}
+          style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+        >
+          Refresh
+        </button>
+      </div>
+
+      {loading && <p style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Loading active rooms...</p>}
+      
+      {error && <p style={{ color: '#ff4444' }}>{error}</p>}
+      
+      {!loading && !error && activeRooms.length === 0 && (
+        <p style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+          No active meetings found. Start a new meeting from the Demo tab!
+        </p>
+      )}
+
+      {!loading && activeRooms.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {activeRooms.map((room) => (
+            <div
+              key={room.name}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '1rem',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                borderRadius: '8px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <strong style={{ fontSize: '1rem' }}>{room.name}</strong>
+                <span style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.7)' }}>
+                  {room.numParticipants} participant{room.numParticipants !== 1 ? 's' : ''} • Created {formatTime(room.creationTime)}
+                </span>
+              </div>
+              <button
+                className="lk-button"
+                onClick={() => joinRoom(room.name)}
+                style={{ padding: '0.5rem 1.5rem', whiteSpace: 'nowrap' }}
+              >
+                Join
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -182,6 +293,7 @@ export default function Page() {
           <Tabs>
             <DemoMeetingTab label="Demo" />
             <CustomConnectionTab label="Custom" />
+            <JoinExistingTab label="Join Existing" />
           </Tabs>
         </Suspense>
       </main>

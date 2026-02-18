@@ -6,7 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;
-const LIVEKIT_URL = process.env.LIVEKIT_URL;
+// Use NEXT_PUBLIC_LIVEKIT_URL for client WebSocket connections (wss:// through nginx)
+const LIVEKIT_CLIENT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
 const COOKIE_KEY = 'random-participant-postfix';
 
@@ -17,10 +18,10 @@ export async function GET(request: NextRequest) {
     const participantName = request.nextUrl.searchParams.get('participantName');
     const metadata = request.nextUrl.searchParams.get('metadata') ?? '';
     const region = request.nextUrl.searchParams.get('region');
-    if (!LIVEKIT_URL) {
-      throw new Error('LIVEKIT_URL is not defined');
+    if (!LIVEKIT_CLIENT_URL) {
+      throw new Error('NEXT_PUBLIC_LIVEKIT_URL is not defined');
     }
-    const livekitServerUrl = region ? getLiveKitURL(LIVEKIT_URL, region) : LIVEKIT_URL;
+    const livekitServerUrl = region ? getLiveKitURL(LIVEKIT_CLIENT_URL, region) : LIVEKIT_CLIENT_URL;
     let randomParticipantPostfix = request.cookies.get(COOKIE_KEY)?.value;
     if (livekitServerUrl === undefined) {
       throw new Error('Invalid region');
